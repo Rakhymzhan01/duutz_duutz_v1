@@ -38,6 +38,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
   const [image, setImage] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null);
   const [resolution, setResolution] = useState<'720p' | '1080p'>('720p');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
+  const [model, setModel] = useState('veo-2.0-generate-001');
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -106,7 +107,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       let operation = await ai.models.generateVideos({
-        model: 'veo-2.0-generate-001',
+        model: model,
         prompt: prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
         config: {
@@ -195,6 +196,18 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
             </div>
           </div>
           
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+            <select 
+              value={model} 
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none"
+            >
+              <option value="veo-2.0-generate-001">Veo 2.0 (Latest)</option>
+              <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
