@@ -1,0 +1,7 @@
+{
+  "name": "duutz duutz AI Video Launchpad",
+  "description": "A visually engaging, responsive web dashboard that serves as the central launchpad for a suite of AI video generation tools. It features a futuristic 'frosted glass' UI on a dynamic gradient background, providing a modern and interactive user experience.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
