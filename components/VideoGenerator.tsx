@@ -106,12 +106,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
+        model: 'veo-2.0-generate-001',
         prompt: prompt,
         ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
         config: {
           numberOfVideos: 1,
-          resolution: resolution,
+          
           aspectRatio: aspectRatio
         }
       });
@@ -160,7 +160,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
         </div>
       ) : videoUrl ? (
         <div className="flex flex-col items-center">
-            <video src={videoUrl} controls autoPlay className="w-full rounded-lg border border-white/20" />
+            <div className="relative">
+              <video src={videoUrl} controls autoPlay className="w-full rounded-lg border border-white/20" />
+              <img 
+                src="/WhatsApp Image 2025-11-03 at 13.16.57.jpeg" 
+                alt="Logo"
+                className="absolute top-4 right-4 w-16 h-16 opacity-80 pointer-events-none rounded-lg"
+              />
+            </div>
             <button onClick={() => setVideoUrl(null)} className="mt-6 bg-purple-600/50 hover:bg-purple-500/80 text-white font-bold py-2 px-6 rounded-full transition-colors duration-300 border border-purple-400">
                 Create Another Video
             </button>
