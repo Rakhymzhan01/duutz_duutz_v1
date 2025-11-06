@@ -23,15 +23,29 @@ interface RequestInputProps {
   setPrompt: (prompt: string) => void;
   audioUrl: string | null;
   setAudioUrl: (url: string | null) => void;
+  onAuthRequired?: () => void;
+  isAuthenticated?: boolean;
 }
 
-const RequestInput: React.FC<RequestInputProps> = ({ prompt, setPrompt, audioUrl, setAudioUrl }) => {
+const RequestInput: React.FC<RequestInputProps> = ({ 
+  prompt, 
+  setPrompt, 
+  audioUrl, 
+  setAudioUrl, 
+  onAuthRequired,
+  isAuthenticated = false 
+}) => {
   const [mode, setMode] = useState<'text' | 'audio'>('text');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const handleStartRecording = async () => {
+    if (!isAuthenticated) {
+      onAuthRequired?.();
+      return;
+    }
+    
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorderRef.current = new MediaRecorder(stream);
@@ -94,9 +108,11 @@ const RequestInput: React.FC<RequestInputProps> = ({ prompt, setPrompt, audioUrl
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe the video you want to create..."
+          placeholder={isAuthenticated ? "Describe the video you want to create..." : "Sign in to start creating videos..."}
           className="w-full h-24 p-4 bg-black/20 rounded-lg text-white placeholder-gray-400 border border-transparent focus:border-purple-400 focus:ring-0 focus:outline-none transition-colors"
           aria-label="Text prompt input"
+          disabled={!isAuthenticated}
+          onClick={!isAuthenticated ? onAuthRequired : undefined}
         />
       ) : (
         <div className="flex flex-col items-center justify-center h-24 p-4 bg-black/20 rounded-lg">

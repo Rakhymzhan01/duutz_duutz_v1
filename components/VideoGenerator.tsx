@@ -38,7 +38,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
   const [image, setImage] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null);
   const [resolution, setResolution] = useState<'720p' | '1080p'>('720p');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
-  const [model, setModel] = useState('veo-2.0-generate-001');
+  const [model, setModel] = useState('veo-3.1-fast-generate-preview');
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -203,7 +203,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
               onChange={(e) => setModel(e.target.value)}
               className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none"
             >
-              <option value="veo-2.0-generate-001">Veo 2.0 (Latest)</option>
               <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
             </select>
           </div>

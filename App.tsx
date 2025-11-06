@@ -2,6 +2,10 @@ import React, { useState, useCallback } from 'react';
 import ToolCard from './components/ToolCard';
 import RequestInput from './components/RequestInput';
 import VideoGenerator from './components/VideoGenerator';
+import AuthModal from './components/AuthModal';
+import UserProfile from './components/UserProfile';
+import LoadingSpinner from './components/LoadingSpinner';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TOOLS } from './constants';
 import { Tool } from './types';
 
@@ -35,26 +39,70 @@ const BackgroundNodes = () => (
   </svg>
 );
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [page, setPage] = useState<'dashboard' | 'generator'>('dashboard');
   const [prompt, setPrompt] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleCardClick = useCallback((tool: Tool) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
     setActiveTool(tool);
     setPage('generator');
-  }, []);
+  }, [isAuthenticated]);
 
   const handleBackToDashboard = useCallback(() => {
     setPage('dashboard');
     setActiveTool(null);
   }, []);
 
+  const handleAuthRequired = useCallback(() => {
+    setShowAuthModal(true);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="relative min-h-screen w-full bg-gradient-to-br from-[#0a0328] via-[#1a0c4d] to-[#4c1d95] text-white overflow-hidden">
+        <BackgroundNodes />
+        <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 sm:p-8">
+          <LoadingSpinner size="lg" text="Loading duutz duutz..." />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen w-full bg-gradient-to-br from-[#0a0328] via-[#1a0c4d] to-[#4c1d95] text-white overflow-hidden">
       <BackgroundNodes />
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 sm:p-8">
+      
+      {/* Top Navigation */}
+      <nav className="relative z-20 flex justify-between items-center p-6">
+        <div className="flex items-center space-x-2">
+          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
+            duutz duutz
+          </h2>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {isAuthenticated ? (
+            <UserProfile />
+          ) : (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold py-2 px-6 rounded-lg hover:from-purple-600 hover:to-cyan-600 transition-all duration-200 transform hover:scale-105"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+      </nav>
+
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] p-4 sm:p-8">
         {page === 'dashboard' ? (
           <>
             <header className="text-center mb-12">
@@ -62,7 +110,17 @@ const App: React.FC = () => {
                 duutz duutz
               </h1>
               <p className="mt-4 text-lg text-purple-200 max-w-2xl mx-auto">
-                Your central launchpad for a suite of next-generation AI video tools. Choose a tool below to begin creating.
+                Your central launchpad for a suite of next-generation AI video tools. 
+                {!isAuthenticated && (
+                  <span className="block mt-2 text-cyan-400">
+                    <button 
+                      onClick={() => setShowAuthModal(true)}
+                      className="underline hover:text-cyan-300"
+                    >
+                      Sign in
+                    </button> to start creating amazing videos!
+                  </span>
+                )}
               </p>
             </header>
             
@@ -71,11 +129,18 @@ const App: React.FC = () => {
               setPrompt={setPrompt}
               audioUrl={audioUrl}
               setAudioUrl={setAudioUrl}
+              onAuthRequired={handleAuthRequired}
+              isAuthenticated={isAuthenticated}
             />
             
             <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {TOOLS.map((tool) => (
-                <ToolCard key={tool.id} tool={tool} onClick={handleCardClick} />
+                <ToolCard 
+                  key={tool.id} 
+                  tool={tool} 
+                  onClick={handleCardClick}
+                  isLocked={!isAuthenticated}
+                />
               ))}
             </div>
           </>
@@ -87,7 +152,20 @@ const App: React.FC = () => {
           />
         ) : null}
       </main>
+
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
