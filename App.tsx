@@ -52,13 +52,9 @@ const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleCardClick = useCallback((tool: Tool) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
     setActiveTool(tool);
     setPage('generator');
-  }, [isAuthenticated]);
+  }, []);
 
   const handleBackToDashboard = useCallback(() => {
     setPage('dashboard');
@@ -116,16 +112,6 @@ const AppContent: React.FC = () => {
               </h1>
               <p className="mt-4 text-lg text-purple-200 max-w-2xl mx-auto">
                 {t('dashboard.subtitle')}
-                {!isAuthenticated && (
-                  <span className="block mt-2 text-cyan-400">
-                    <button 
-                      onClick={() => setShowAuthModal(true)}
-                      className="underline hover:text-cyan-300"
-                    >
-                      {t('dashboard.signInLink')}
-                    </button> {t('dashboard.signInPrompt')}
-                  </span>
-                )}
               </p>
             </header>
             
@@ -144,7 +130,7 @@ const AppContent: React.FC = () => {
                   key={tool.id} 
                   tool={tool} 
                   onClick={handleCardClick}
-                  isLocked={!isAuthenticated}
+                  isLocked={false}
                 />
               ))}
             </div>
