@@ -1,0 +1,97 @@
+/* RTL Support for Arabic */
+[dir="rtl"] {
+  direction: rtl;
+}
+
+[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-right: 1rem;
+  margin-left: 0;
+}
+
+[dir="rtl"] .space-x-8 > :not([hidden]) ~ :not([hidden]) {
+  margin-right: 2rem;
+  margin-left: 0;
+}
+
+/* Fix flexbox spacing for RTL */
+[dir="rtl"] .flex {
+  direction: rtl;
+}
+
+[dir="rtl"] .flex.items-center {
+  direction: rtl;
+}
+
+/* Text alignment fixes */
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+/* Language switcher specific RTL fixes */
+[dir="rtl"] .language-switcher {
+  direction: ltr; /* Keep language switcher LTR for consistency */
+}
+
+/* Grid and layout fixes */
+[dir="rtl"] .grid {
+  direction: ltr;
+}
+
+/* Form input fixes */
+[dir="rtl"] input, [dir="rtl"] textarea {
+  text-align: right;
+}
+
+[dir="rtl"] input::placeholder, [dir="rtl"] textarea::placeholder {
+  text-align: right;
+}
+
+/* Padding and margin fixes for RTL */
+[dir="rtl"] .pr-6 {
+  padding-left: 1.5rem;
+  padding-right: 0;
+}
+
+[dir="rtl"] .pl-6 {
+  padding-right: 1.5rem;
+  padding-left: 0;
+}
+
+[dir="rtl"] .mr-2 {
+  margin-left: 0.5rem;
+  margin-right: 0;
+}
+
+[dir="rtl"] .ml-2 {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+/* Custom fonts for Arabic */
+[dir="rtl"] body,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] p,
+[dir="rtl"] span {
+  font-family: 'Segoe UI', Tahoma, Arial, Helvetica, sans-serif;
+}
+
+/* Fix button alignment */
+[dir="rtl"] button {
+  text-align: center;
+}
+
+/* Fix modal alignment */
+[dir="rtl"] .text-center {
+  text-align: center;
+}

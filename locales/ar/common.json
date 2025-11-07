@@ -1,0 +1,21 @@
+{
+  "brandName": "duutz duutz",
+  "navigation": {
+    "signIn": "تسجيل الدخول"
+  },
+  "dashboard": {
+    "title": "duutz duutz",
+    "subtitle": "منصتك المركزية لمجموعة من أدوات الذكاء الاصطناعي لإنشاء الفيديو من الجيل القادم.",
+    "signInPrompt": "لبدء إنشاء فيديوهات رائعة!",
+    "signInLink": "تسجيل الدخول"
+  },
+  "loading": {
+    "default": "جاري تحميل duutz duutz..."
+  },
+  "buttons": {
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "createAccount": "إنشاء حساب",
+    "back": "رجوع"
+  }
+}

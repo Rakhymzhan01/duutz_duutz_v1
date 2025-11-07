@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from './Modal';
 
@@ -18,6 +19,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { login, register } = useAuth();
+  const { t } = useTranslation('auth');
 
   const resetForm = () => {
     setEmail('');
@@ -45,24 +47,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         if (success) {
           handleClose();
         } else {
-          setError('Invalid email or password');
+          setError(t('errors.invalidCredentials'));
         }
       } else {
         // Registration validation
         if (password !== confirmPassword) {
-          setError('Passwords do not match');
+          setError(t('errors.passwordMismatch'));
           setIsLoading(false);
           return;
         }
 
         if (password.length < 8) {
-          setError('Password must be at least 8 characters long');
+          setError(t('errors.passwordLength'));
           setIsLoading(false);
           return;
         }
 
         if (!firstName.trim() || !lastName.trim()) {
-          setError('First name and last name are required');
+          setError(t('errors.nameRequired'));
           setIsLoading(false);
           return;
         }
@@ -71,12 +73,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         if (success) {
           handleClose();
         } else {
-          setError('Registration failed. Please try again.');
+          setError(t('errors.registrationFailed'));
         }
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError('An unexpected error occurred. Please try again.');
+      setError(t('errors.unexpectedError'));
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +93,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={handleClose}>
       <div className="bg-gradient-to-br from-purple-900/90 to-blue-900/90 backdrop-blur-sm p-8 rounded-2xl border border-purple-500/30 w-full max-w-md">
         <h2 className="text-3xl font-bold text-center mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
-          {isLogin ? 'Welcome Back' : 'Join duutz duutz'}
+          {isLogin ? t('modal.welcomeBack') : t('modal.joinDuutz')}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -103,7 +105,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-purple-200 mb-2">
-              Email Address
+              {t('modal.emailAddress')}
             </label>
             <input
               type="email"
@@ -112,7 +114,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-white placeholder-purple-300"
-              placeholder="your@email.com"
+              placeholder={t('modal.placeholders.email')}
             />
           </div>
 
@@ -121,7 +123,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-purple-200 mb-2">
-                    First Name
+                    {t('modal.firstName')}
                   </label>
                   <input
                     type="text"
@@ -130,12 +132,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     onChange={(e) => setFirstName(e.target.value)}
                     required
                     className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-white placeholder-purple-300"
-                    placeholder="John"
+                    placeholder={t('modal.placeholders.firstName')}
                   />
                 </div>
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium text-purple-200 mb-2">
-                    Last Name
+                    {t('modal.lastName')}
                   </label>
                   <input
                     type="text"
@@ -144,7 +146,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     onChange={(e) => setLastName(e.target.value)}
                     required
                     className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-white placeholder-purple-300"
-                    placeholder="Doe"
+                    placeholder={t('modal.placeholders.lastName')}
                   />
                 </div>
               </div>
@@ -153,7 +155,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-purple-200 mb-2">
-              Password
+              {t('modal.password')}
             </label>
             <input
               type="password"
@@ -163,14 +165,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               required
               minLength={isLogin ? undefined : 8}
               className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-white placeholder-purple-300"
-              placeholder="••••••••"
+              placeholder={t('modal.placeholders.password')}
             />
           </div>
 
           {!isLogin && (
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-purple-200 mb-2">
-                Confirm Password
+                {t('modal.confirmPassword')}
               </label>
               <input
                 type="password"
@@ -179,7 +181,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-purple-900/50 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-white placeholder-purple-300"
-                placeholder="••••••••"
+                placeholder={t('modal.placeholders.password')}
               />
             </div>
           )}
@@ -192,22 +194,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             {isLoading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                {isLogin ? 'Signing In...' : 'Creating Account...'}
+                {isLogin ? t('modal.signingIn') : t('modal.creatingAccount')}
               </div>
             ) : (
-              isLogin ? 'Sign In' : 'Create Account'
+              isLogin ? t('modal.signIn') : t('modal.createAccount')
             )}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-purple-200">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            {isLogin ? t('modal.noAccount') : t('modal.hasAccount')}
             <button
               onClick={toggleMode}
               className="text-cyan-400 hover:text-cyan-300 font-semibold underline"
             >
-              {isLogin ? 'Sign up' : 'Sign in'}
+              {isLogin ? t('modal.signUp') : t('modal.signIn')}
             </button>
           </p>
         </div>

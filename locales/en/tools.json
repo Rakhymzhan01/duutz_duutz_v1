@@ -1,0 +1,19 @@
+{
+  "generateVideo": {
+    "title": "Generate Video",
+    "description": "Turn your ideas into animated and creative video content from text prompts, scripts, or images."
+  },
+  "talkPicture": {
+    "title": "Talk Picture", 
+    "description": "Animate still images. Make photos, drawings, or avatars speak with your provided audio or text."
+  },
+  "seriousVideo": {
+    "title": "Serious Video",
+    "description": "Aimed at professionals. Turn reports, spreadsheets, and presentations into data-driven videos."
+  },
+  "tellStory": {
+    "title": "Tell Story",
+    "description": "A narrative-focused tool. Create scene-by-scene videos, digital storybooks, and more from a script."
+  },
+  "locked": "Sign in to use this tool"
+}

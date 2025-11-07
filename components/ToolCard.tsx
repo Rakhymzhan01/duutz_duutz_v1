@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Tool } from '../types';
 
 interface ToolCardProps {
@@ -9,6 +10,7 @@ interface ToolCardProps {
 }
 
 const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, isLocked = false }) => {
+  const { t } = useTranslation('tools');
   return (
     <div 
       onClick={() => onClick(tool)}
@@ -30,7 +32,7 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, isLocked = false }) 
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
               />
             </svg>
-            <p className="text-purple-200 text-sm font-medium">Sign in to use</p>
+            <p className="text-purple-200 text-sm font-medium">{t('locked')}</p>
           </div>
         </div>
       )}

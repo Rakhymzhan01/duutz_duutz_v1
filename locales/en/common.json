@@ -1,0 +1,21 @@
+{
+  "brandName": "duutz duutz",
+  "navigation": {
+    "signIn": "Sign In"
+  },
+  "dashboard": {
+    "title": "duutz duutz",
+    "subtitle": "Your central launchpad for a suite of next-generation AI video tools.",
+    "signInPrompt": "to start creating amazing videos!",
+    "signInLink": "Sign in"
+  },
+  "loading": {
+    "default": "Loading duutz duutz..."
+  },
+  "buttons": {
+    "signIn": "Sign In",
+    "signUp": "Sign up",
+    "createAccount": "Create Account",
+    "back": "Back"
+  }
+}

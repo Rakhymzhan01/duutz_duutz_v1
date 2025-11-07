@@ -1,12 +1,14 @@
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import ToolCard from './components/ToolCard';
 import RequestInput from './components/RequestInput';
 import VideoGenerator from './components/VideoGenerator';
 import AuthModal from './components/AuthModal';
 import UserProfile from './components/UserProfile';
 import LoadingSpinner from './components/LoadingSpinner';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { TOOLS } from './constants';
+import { useTools } from './hooks/useTools';
 import { Tool } from './types';
 
 const BackgroundNodes = () => (
@@ -41,6 +43,8 @@ const BackgroundNodes = () => (
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useTranslation();
+  const tools = useTools();
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [page, setPage] = useState<'dashboard' | 'generator'>('dashboard');
   const [prompt, setPrompt] = useState('');
@@ -70,7 +74,7 @@ const AppContent: React.FC = () => {
       <div className="relative min-h-screen w-full bg-gradient-to-br from-[#0a0328] via-[#1a0c4d] to-[#4c1d95] text-white overflow-hidden">
         <BackgroundNodes />
         <main className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 sm:p-8">
-          <LoadingSpinner size="lg" text="Loading duutz duutz..." />
+          <LoadingSpinner size="lg" text={t('loading.default')} />
         </main>
       </div>
     );
@@ -84,11 +88,12 @@ const AppContent: React.FC = () => {
       <nav className="relative z-20 flex justify-between items-center p-6">
         <div className="flex items-center space-x-2">
           <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
-            duutz duutz
+            {t('brandName')}
           </h2>
         </div>
         
         <div className="flex items-center space-x-4">
+          <LanguageSwitcher />
           {isAuthenticated ? (
             <UserProfile />
           ) : (
@@ -96,7 +101,7 @@ const AppContent: React.FC = () => {
               onClick={() => setShowAuthModal(true)}
               className="bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold py-2 px-6 rounded-lg hover:from-purple-600 hover:to-cyan-600 transition-all duration-200 transform hover:scale-105"
             >
-              Sign In
+              {t('navigation.signIn')}
             </button>
           )}
         </div>
@@ -107,18 +112,18 @@ const AppContent: React.FC = () => {
           <>
             <header className="text-center mb-12">
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
-                duutz duutz
+                {t('dashboard.title')}
               </h1>
               <p className="mt-4 text-lg text-purple-200 max-w-2xl mx-auto">
-                Your central launchpad for a suite of next-generation AI video tools. 
+                {t('dashboard.subtitle')}
                 {!isAuthenticated && (
                   <span className="block mt-2 text-cyan-400">
                     <button 
                       onClick={() => setShowAuthModal(true)}
                       className="underline hover:text-cyan-300"
                     >
-                      Sign in
-                    </button> to start creating amazing videos!
+                      {t('dashboard.signInLink')}
+                    </button> {t('dashboard.signInPrompt')}
                   </span>
                 )}
               </p>
@@ -134,7 +139,7 @@ const AppContent: React.FC = () => {
             />
             
             <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {TOOLS.map((tool) => (
+              {tools.map((tool) => (
                 <ToolCard 
                   key={tool.id} 
                   tool={tool} 
