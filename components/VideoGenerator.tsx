@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Tool } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { useAuth } from '../contexts/AuthContext';
 
 const loadingMessages = [
   'Warming up the AI circuits...',
@@ -34,28 +34,30 @@ const BackIcon = () => (
 );
 
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, onBack }) => {
+  const { user, tokens, isAuthenticated } = useAuth();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [image, setImage] = useState<{ base64: string; mimeType: string; previewUrl: string } | null>(null);
   const [resolution, setResolution] = useState<'720p' | '1080p'>('720p');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
-  const [model, setModel] = useState('veo-3.1-fast-generate-preview');
+  const [duration, setDuration] = useState(5);
+  const [model, setModel] = useState('sora-1.0-turbo');
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
+  const [videoMetadata, setVideoMetadata] = useState<any>(null);
   
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const loadingIntervalRef = useRef<number | null>(null);
 
-  const checkApiKey = useCallback(async () => {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    setApiKeyReady(!!apiKey);
-  }, []);
-
   useEffect(() => {
-    checkApiKey();
-  }, [checkApiKey]);
+    // Use the auth context to check authentication status
+    console.log('Auth status - isAuthenticated:', isAuthenticated);
+    console.log('User:', user);
+    console.log('Tokens:', tokens);
+    setApiKeyReady(isAuthenticated && !!tokens?.access_token);
+  }, [isAuthenticated, user, tokens]);
 
   useEffect(() => {
     if (isGenerating) {
@@ -84,14 +86,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     }
   };
   
-  const handleSelectKey = async () => {
-    // For standalone version, API key is set via environment variables
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (apiKey) {
-      setApiKeyReady(true);
-    } else {
-      setError('Please set GEMINI_API_KEY in your .env file');
-    }
+  const handleLogin = async () => {
+    // Redirect to login or show login modal
+    // For now, just refresh the page to re-check auth context
+    window.location.reload();
   };
 
   const handleGenerate = async () => {
@@ -105,39 +103,135 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     setLoadingMessage(loadingMessages[0]);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      let operation = await ai.models.generateVideos({
-        model: model,
-        prompt: prompt,
-        ...(image && { image: { imageBytes: image.base64, mimeType: image.mimeType } }),
-        config: {
-          numberOfVideos: 1,
-          
-          aspectRatio: aspectRatio
+      // Get access token from auth context
+      if (!tokens?.access_token) {
+        throw new Error('Please log in to generate videos');
+      }
+      
+      const accessToken = tokens.access_token;
+      console.log('Using access token:', accessToken ? 'Token found' : 'No token');
+
+      // Upload image if provided
+      let imageId = null;
+      if (image) {
+        const formData = new FormData();
+        const imageBlob = new Blob([Uint8Array.from(atob(image.base64), c => c.charCodeAt(0))], { type: image.mimeType });
+        formData.append('file', imageBlob, 'image.' + image.mimeType.split('/')[1]);
+        
+        const uploadResponse = await fetch('http://localhost:8000/api/v1/images/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image');
         }
+        
+        const uploadResult = await uploadResponse.json();
+        imageId = uploadResult.id;
+      }
+
+      // Convert resolution settings to actual dimensions
+      let width, height;
+      if (resolution === '720p') {
+        if (aspectRatio === '16:9') {
+          width = 1280;
+          height = 720;
+        } else { // 9:16
+          width = 720;
+          height = 1280;
+        }
+      } else { // 1080p
+        if (aspectRatio === '16:9') {
+          width = 1920;
+          height = 1080;
+        } else { // 9:16
+          width = 1080;
+          height = 1920;
+        }
+      }
+
+      // Start video generation
+      const generateResponse = await fetch('http://localhost:8000/api/v1/videos/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          duration_seconds: duration,
+          resolution_width: width,
+          resolution_height: height,
+          fps: 24,
+          provider: model.includes('sora') ? 'SORA2' : model.includes('wan') ? 'WAN' : 'VEO3',
+          image_id: imageId,
+          provider_specific_params: {
+            model: model
+          }
+        }),
       });
 
-      while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
+      if (!generateResponse.ok) {
+        const errorData = await generateResponse.json();
+        throw new Error(errorData.detail || 'Failed to start video generation');
       }
 
-      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (downloadLink) {
-        const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-        const videoBlob = await videoResponse.blob();
-        const url = URL.createObjectURL(videoBlob);
-        setVideoUrl(url);
-      } else {
-        throw new Error('Video generation finished, but no download link was provided.');
+      const generateResult = await generateResponse.json();
+      const videoId = generateResult.id;
+
+      // Poll for completion
+      let completed = false;
+      let attempts = 0;
+      const maxAttempts = 120; // 10 minutes
+
+      while (!completed && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        attempts++;
+
+        const statusResponse = await fetch(`http://localhost:8000/api/v1/videos/${videoId}/status`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!statusResponse.ok) {
+          throw new Error('Failed to check video status');
+        }
+
+        const statusResult = await statusResponse.json();
+        
+        // Update loading message based on progress
+        if (statusResult.progress_percentage > 0) {
+          const messageIndex = Math.floor((statusResult.progress_percentage / 100) * loadingMessages.length);
+          setLoadingMessage(loadingMessages[Math.min(messageIndex, loadingMessages.length - 1)]);
+        }
+
+        if (statusResult.status === 'completed') {
+          setVideoUrl(statusResult.video_url);
+          
+          // Show notice if it's a mock video
+          if (statusResult.metadata?.mock) {
+            console.log('Mock video generated for testing:', statusResult.metadata);
+          }
+          
+          completed = true;
+        } else if (statusResult.status === 'failed') {
+          throw new Error(statusResult.error_message || 'Video generation failed');
+        }
       }
+
+      if (!completed) {
+        throw new Error('Video generation timed out. Please try again.');
+      }
+
     } catch (e: any) {
       console.error(e);
       let errorMessage = e.message || 'An unknown error occurred.';
-      if (errorMessage.includes("Requested entity was not found.")) {
-          errorMessage = "Your API Key is invalid. Please select a valid key.";
-          setApiKeyReady(false); // Reset key state
-      }
       setError(errorMessage);
     } finally {
       setIsGenerating(false);
@@ -197,17 +291,69 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">AI Model</label>
             <select 
               value={model} 
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(e) => {
+                const newModel = e.target.value;
+                setModel(newModel);
+                
+                // Reset duration if it exceeds new model's limit
+                let maxDuration = 60; // Default
+                if (newModel.includes('sora')) maxDuration = 20;
+                else if (newModel.includes('wan')) maxDuration = 30;
+                else if (newModel.includes('veo')) maxDuration = 60;
+                
+                if (duration > maxDuration) {
+                  setDuration(Math.min(duration, maxDuration));
+                }
+              }}
               className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none"
             >
-              <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
+              <option value="sora-1.0-turbo">OpenAI Sora 1.0 Turbo (High Quality, 20s max)</option>
+              <option value="veo-3.1-fast-generate-preview">Google Veo 3.1 Fast (Fast Generation, 60s max)</option>
+              <option value="wan-video-v1">WAN AI Video (Affordable, 30s max)</option>
             </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {model.includes('sora') 
+                ? 'Sora: Superior quality, supports up to 20 seconds' 
+                : model.includes('wan')
+                ? 'WAN AI: Affordable pricing, supports up to 30 seconds'
+                : 'Veo 3: Faster generation, supports up to 60 seconds'
+              }
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Duration</label>
+                  <select 
+                    value={duration} 
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                    className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white focus:border-purple-400 focus:outline-none"
+                  >
+                    {[3, 5, 10, 15, 20, 30, 45, 60].map(seconds => {
+                      let maxDuration = 60; // Default
+                      if (model.includes('sora')) maxDuration = 20;
+                      else if (model.includes('wan')) maxDuration = 30;
+                      else if (model.includes('veo')) maxDuration = 60;
+                      
+                      const isAvailable = seconds <= maxDuration;
+                      return (
+                        <option 
+                          key={seconds} 
+                          value={seconds}
+                          disabled={!isAvailable}
+                        >
+                          {seconds} seconds {!isAvailable && '(Not supported)'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Max: {model.includes('sora') ? '20s' : model.includes('wan') ? '30s' : '60s'}
+                  </p>
+              </div>
               <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Resolution</label>
                   <div className="flex gap-2">
@@ -226,13 +372,30 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
 
           {!apiKeyReady && (
             <div className="p-4 rounded-lg bg-yellow-900/50 border border-yellow-400 text-yellow-200 text-center">
-              <p className="mb-2">An API key is required for video generation.</p>
-              <button onClick={handleSelectKey} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Select API Key</button>
-              <p className="text-xs mt-2">For more information, see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-yellow-100">billing documentation</a>.</p>
+              <p className="mb-2">Please log in to generate videos.</p>
+              <div className="flex gap-2 justify-center">
+                <button onClick={handleLogin} className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Log In</button>
+                <button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Refresh Page</button>
+              </div>
+              <p className="text-xs mt-2">Video generation requires authentication and credits.</p>
             </div>
            )}
 
           {error && <p className="text-red-400 bg-red-900/50 p-3 rounded-lg border border-red-500">{error}</p>}
+          
+          <div className="p-3 rounded-lg bg-blue-900/30 border border-blue-500/50 text-blue-200 text-sm">
+            <p>Model: <span className="font-semibold">
+              {model.includes('sora') ? 'OpenAI Sora' : 
+               model.includes('wan') ? 'WAN AI' : 
+               'Google Veo 3'}
+            </span></p>
+            <p className="text-xs opacity-80">
+              {duration}s • {image ? 'With image' : 'Text only'} • {resolution} {aspectRatio}
+            </p>
+            <p className="text-xs opacity-60 mt-1">
+              Auth Status: {apiKeyReady ? '✅ Logged in' : '❌ Not logged in'}
+            </p>
+          </div>
           
           <button 
             onClick={handleGenerate} 
