@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Tool } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://62.171.165.180/api/v1';
+
 const loadingMessages = [
   'Warming up the AI circuits...',
   'Teaching pixels to dance...',
@@ -118,7 +120,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
         const imageBlob = new Blob([Uint8Array.from(atob(image.base64), c => c.charCodeAt(0))], { type: image.mimeType });
         formData.append('file', imageBlob, 'image.' + image.mimeType.split('/')[1]);
         
-        const uploadResponse = await fetch('http://localhost:8000/api/v1/images/upload', {
+       const uploadResponse = await fetch(`${API_BASE_URL}/images/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -155,7 +157,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       }
 
       // Start video generation
-      const generateResponse = await fetch('http://localhost:8000/api/v1/videos/generate', {
+      const generateResponse = await fetch(`${API_BASE_URL}/videos/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -192,7 +194,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
         await new Promise(resolve => setTimeout(resolve, 5000));
         attempts++;
 
-        const statusResponse = await fetch(`http://localhost:8000/api/v1/videos/${videoId}/status`, {
+        const statusResponse = await fetch(`${API_BASE_URL}/videos/${videoId}/status`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
