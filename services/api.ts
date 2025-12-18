@@ -35,13 +35,30 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.text();
+      const errorText = await response.text();
       console.error('Registration error:', { 
         status: response.status, 
         statusText: response.statusText, 
-        error 
+        error: errorText 
       });
-      throw new Error(error || 'Registration failed');
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.detail && Array.isArray(errorData.detail)) {
+          // Extract user-friendly error messages from validation errors
+          const messages = errorData.detail.map((err: any) => {
+            if (err.loc && err.msg) {
+              const field = err.loc[err.loc.length - 1];
+              return `${field}: ${err.msg}`;
+            }
+            return err.msg || 'Validation error';
+          });
+          throw new Error(messages.join(', '));
+        }
+        throw new Error(errorData.message || errorData.detail || 'Registration failed');
+      } catch (parseError) {
+        throw new Error(errorText || 'Registration failed');
+      }
     }
 
     const data = await response.json();
@@ -88,9 +105,25 @@ class ApiService {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('Login error response:', error);
-        throw new Error(error || 'Login failed');
+        const errorText = await response.text();
+        console.error('Login error response:', errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.detail && Array.isArray(errorData.detail)) {
+            const messages = errorData.detail.map((err: any) => {
+              if (err.loc && err.msg) {
+                const field = err.loc[err.loc.length - 1];
+                return `${field}: ${err.msg}`;
+              }
+              return err.msg || 'Validation error';
+            });
+            throw new Error(messages.join(', '));
+          }
+          throw new Error(errorData.message || errorData.detail || 'Login failed');
+        } catch (parseError) {
+          throw new Error(errorText || 'Login failed');
+        }
       }
 
       const data = await response.json();

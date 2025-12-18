@@ -43,12 +43,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isLogin) {
-        const success = await login(email, password);
-        if (success) {
-          handleClose();
-        } else {
-          setError(t('errors.invalidCredentials'));
-        }
+        await login(email, password);
+        handleClose();
       } else {
         // Registration validation
         if (password !== confirmPassword) {
@@ -69,16 +65,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           return;
         }
 
-        const success = await register(email, password, firstName.trim(), lastName.trim());
-        if (success) {
-          handleClose();
-        } else {
-          setError(t('errors.registrationFailed'));
-        }
+        await register(email, password, firstName.trim(), lastName.trim());
+        handleClose();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth error:', error);
-      setError(t('errors.unexpectedError'));
+      // Display the specific error message from the API
+      const errorMessage = error?.message || t('errors.unexpectedError');
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +93,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded-lg text-sm">
-              {error}
+              {error.split(', ').map((msg, index) => (
+                <div key={index} className={index > 0 ? 'mt-1' : ''}>
+                  {msg}
+                </div>
+              ))}
             </div>
           )}
 
