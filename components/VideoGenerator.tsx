@@ -42,7 +42,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
   const [resolution, setResolution] = useState<'720p' | '1080p'>('720p');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [duration, setDuration] = useState(5);
-  const [model, setModel] = useState('sora-1.0-turbo');
+  const [model, setModel] = useState('veo-3.1-fast-generate-preview');
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -169,7 +169,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
           resolution_width: width,
           resolution_height: height,
           fps: 24,
-          provider: model.includes('sora') ? 'SORA2' : model.includes('wan') ? 'WAN' : 'VEO3',
+          provider: model.includes('sora') ? 'sora' : model.includes('wan') ? 'wan' : 'veo3',
           image_id: imageId,
           provider_specific_params: {
             model: model

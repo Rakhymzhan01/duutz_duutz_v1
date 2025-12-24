@@ -1,30 +1,31 @@
 // API service for communicating with the backend
-import { User, AuthTokens } from '../types';
+import { User, AuthTokens } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 class ApiService {
   private getAuthHeaders(token?: string): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
     };
-    
+
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
-    
+
     return headers;
   }
 
   async register(
-    email: string, 
-    password: string, 
-    firstName: string, 
+    email: string,
+    password: string,
+    firstName: string,
     lastName: string
   ): Promise<{ user: User; tokens: AuthTokens }> {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({
         email,
@@ -36,12 +37,12 @@ class ApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Registration error:', { 
-        status: response.status, 
-        statusText: response.statusText, 
-        error: errorText 
+      console.error("Registration error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
       });
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.detail && Array.isArray(errorData.detail)) {
@@ -51,13 +52,15 @@ class ApiService {
               const field = err.loc[err.loc.length - 1];
               return `${field}: ${err.msg}`;
             }
-            return err.msg || 'Validation error';
+            return err.msg || "Validation error";
           });
-          throw new Error(messages.join(', '));
+          throw new Error(messages.join(", "));
         }
-        throw new Error(errorData.message || errorData.detail || 'Registration failed');
+        throw new Error(
+          errorData.message || errorData.detail || "Registration failed"
+        );
       } catch (parseError) {
-        throw new Error(errorText || 'Registration failed');
+        throw new Error(errorText || "Registration failed");
       }
     }
 
@@ -73,41 +76,44 @@ class ApiService {
     };
   }
 
-  async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
+  async login(
+    email: string,
+    password: string
+  ): Promise<{ user: User; tokens: AuthTokens }> {
     const requestBody = JSON.stringify({
       email: email.trim(),
       password: password,
     });
 
-    console.log('Login request:', { 
-      email: email.trim(), 
+    console.log("Login request:", {
+      email: email.trim(),
       url: `${API_BASE_URL}/auth/login`,
       bodyLength: requestBody.length,
-      body: requestBody
+      body: requestBody,
     });
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: requestBody,
-        mode: 'cors',
-        credentials: 'omit',
+        mode: "cors",
+        credentials: "omit",
       });
 
-      console.log('Login response:', { 
-        status: response.status, 
+      console.log("Login response:", {
+        status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: Object.fromEntries(response.headers.entries()),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Login error response:', errorText);
-        
+        console.error("Login error response:", errorText);
+
         try {
           const errorData = JSON.parse(errorText);
           if (errorData.detail && Array.isArray(errorData.detail)) {
@@ -116,13 +122,15 @@ class ApiService {
                 const field = err.loc[err.loc.length - 1];
                 return `${field}: ${err.msg}`;
               }
-              return err.msg || 'Validation error';
+              return err.msg || "Validation error";
             });
-            throw new Error(messages.join(', '));
+            throw new Error(messages.join(", "));
           }
-          throw new Error(errorData.message || errorData.detail || 'Login failed');
+          throw new Error(
+            errorData.message || errorData.detail || "Login failed"
+          );
         } catch (parseError) {
-          throw new Error(errorText || 'Login failed');
+          throw new Error(errorText || "Login failed");
         }
       }
 
@@ -137,14 +145,14 @@ class ApiService {
         },
       };
     } catch (error) {
-      console.error('Login fetch error:', error);
+      console.error("Login fetch error:", error);
       throw error;
     }
   }
 
   async refreshToken(refreshToken: string): Promise<{ tokens: AuthTokens }> {
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({
         refresh_token: refreshToken,
@@ -152,7 +160,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error('Token refresh failed');
+      throw new Error("Token refresh failed");
     }
 
     const data = await response.json();
@@ -168,12 +176,12 @@ class ApiService {
 
   async getProfile(accessToken: string): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/user/profile`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getAuthHeaders(accessToken),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch profile');
+      throw new Error("Failed to fetch profile");
     }
 
     return await response.json();
@@ -181,18 +189,18 @@ class ApiService {
 
   async uploadImage(file: File, accessToken: string): Promise<any> {
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append("file", file);
+
     const response = await fetch(`${API_BASE_URL}/images/upload`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error('Image upload failed');
+      throw new Error("Image upload failed");
     }
 
     return await response.json();
@@ -211,7 +219,7 @@ class ApiService {
     accessToken: string
   ): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/videos/generate`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(accessToken),
       body: JSON.stringify({
         prompt,
@@ -220,7 +228,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error('Video generation failed');
+      throw new Error("Video generation failed");
     }
 
     return await response.json();
@@ -228,12 +236,12 @@ class ApiService {
 
   async getVideoStatus(videoId: string, accessToken: string): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/videos/${videoId}/status`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getAuthHeaders(accessToken),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get video status');
+      throw new Error("Failed to get video status");
     }
 
     return await response.json();
@@ -241,12 +249,12 @@ class ApiService {
 
   async getUserVideos(accessToken: string): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/videos/`, {
-      method: 'GET',
+      method: "GET",
       headers: this.getAuthHeaders(accessToken),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get user videos');
+      throw new Error("Failed to get user videos");
     }
 
     return await response.json();
