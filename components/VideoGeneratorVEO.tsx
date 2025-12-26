@@ -1,9 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { GenerationStatus, GenerationState } from '../types';
 import { generateVideo } from '../services/geminiService';
-import Spinner from './Spinner';
-import GeneratedVideo from './GeneratedVideo';
-import FileInput from './FileInput';
 
 const LOADING_MESSAGES = [
     "Warming up the video engine...",
@@ -14,15 +10,26 @@ const LOADING_MESSAGES = [
     "Almost there, polishing the masterpiece..."
 ];
 
-const VideoGenerator: React.FC = () => {
+enum GenerationStatus {
+  IDLE = 'IDLE',
+  GENERATING = 'GENERATING',
+  SUCCESS = 'SUCCESS',
+  ERROR = 'ERROR',
+}
+
+interface GenerationState {
+  status: GenerationStatus;
+  videoUrl?: string;
+  error?: string;
+}
+
+const VideoGeneratorVEO: React.FC = () => {
     const [prompt, setPrompt] = useState<string>('');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [generationState, setGenerationState] = useState<GenerationState>({ status: GenerationStatus.IDLE });
     const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
 
-    // Fix: Refactored useEffect to correctly handle conditional interval setup and cleanup.
-    // This resolves the 'NodeJS.Timeout' type error by using type inference and prevents a potential runtime error.
     useEffect(() => {
         if (generationState.status === GenerationStatus.GENERATING) {
             const interval = setInterval(() => {
@@ -37,7 +44,6 @@ const VideoGenerator: React.FC = () => {
             };
         }
     }, [generationState.status]);
-
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -65,9 +71,12 @@ const VideoGenerator: React.FC = () => {
         setLoadingMessage(LOADING_MESSAGES[0]);
 
         try {
+            console.log('Calling VEO API directly with prompt:', prompt);
             const videoUrl = await generateVideo(prompt, imageFile);
+            console.log('VEO generation successful, video URL:', videoUrl);
             setGenerationState({ status: GenerationStatus.SUCCESS, videoUrl });
         } catch (error) {
+            console.error('VEO generation failed:', error);
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
             setGenerationState({ status: GenerationStatus.ERROR, error: errorMessage });
         }
@@ -91,14 +100,20 @@ const VideoGenerator: React.FC = () => {
                             id="prompt"
                             rows={4}
                             className="w-full bg-gray-900/50 border border-gray-600 rounded-lg p-3 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                            placeholder="e.g., A neon hologram of a cat driving at top speed"
+                            placeholder="e.g., A cat walking on grass"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                         />
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <FileInput onChange={handleImageChange} disabled={!!imageFile} />
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            disabled={!!imageFile}
+                            className="text-white"
+                        />
                          {imagePreviewUrl && (
                              <div className="relative">
                                 <img src={imagePreviewUrl} alt="Preview" className="h-20 w-20 object-cover rounded-lg" />
@@ -118,14 +133,14 @@ const VideoGenerator: React.FC = () => {
                         disabled={isGenerating || !prompt.trim()}
                         className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
                     >
-                        Generate Video
+                        Generate Video with VEO
                     </button>
                 </div>
             )}
 
             {generationState.status === GenerationStatus.GENERATING && (
                 <div className="text-center py-12">
-                    <Spinner />
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto"></div>
                     <p className="mt-4 text-lg font-semibold text-gray-300">Generating your video...</p>
                     <p className="mt-2 text-gray-400">This can take a few minutes. Please be patient.</p>
                     <p className="mt-4 text-cyan-400 font-mono transition-opacity duration-500">{loadingMessage}</p>
@@ -133,7 +148,21 @@ const VideoGenerator: React.FC = () => {
             )}
             
             {generationState.status === GenerationStatus.SUCCESS && generationState.videoUrl && (
-                <GeneratedVideo videoUrl={generationState.videoUrl} onGenerateAnother={resetState} />
+                <div className="text-center py-8">
+                    <h3 className="text-xl font-semibold text-white mb-4">Your Video is Ready!</h3>
+                    <video 
+                        src={generationState.videoUrl} 
+                        controls 
+                        className="w-full max-w-md mx-auto rounded-lg"
+                        autoPlay
+                    />
+                    <button
+                        onClick={resetState}
+                        className="mt-6 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        Generate Another Video
+                    </button>
+                </div>
             )}
 
             {(generationState.status === GenerationStatus.ERROR) && (
@@ -152,4 +181,4 @@ const VideoGenerator: React.FC = () => {
     );
 };
 
-export default VideoGenerator;
+export default VideoGeneratorVEO;

@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import ToolCard from './components/ToolCard';
 import RequestInput from './components/RequestInput';
-import VideoGenerator from './components/VideoGenerator';
+import VideoGenerator from './components/VideoGeneratorBackend';
+// import VideoGeneratorVEO from './components/VideoGeneratorVEO';
 import AuthModal from './components/AuthModal';
 import UserProfile from './components/UserProfile';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -42,14 +43,18 @@ const BackgroundNodes = () => (
 );
 
 const AppContent: React.FC = () => {
+  console.log('AppContent rendering...');
+  
   const { isAuthenticated, isLoading } = useAuth();
   const { t } = useTranslation();
   const tools = useTools();
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
-  const [page, setPage] = useState<'dashboard' | 'generator'>('dashboard');
+  const [page, setPage] = useState<'dashboard' | 'generator' | 'veo-test'>('dashboard');
   const [prompt, setPrompt] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  
+  console.log('AppContent state:', { isLoading, isAuthenticated, page, tools: tools?.length });
 
   const handleCardClick = useCallback((tool: Tool) => {
     setActiveTool(tool);
@@ -89,6 +94,12 @@ const AppContent: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-4">
+          {/* <button
+            onClick={() => setPage('veo-test')}
+            className="bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold py-2 px-4 rounded-lg hover:from-red-600 hover:to-orange-600 transition-all duration-200"
+          >
+            🎬 VEO Test
+          </button> */}
           <LanguageSwitcher />
           {isAuthenticated ? (
             <UserProfile />
@@ -135,6 +146,16 @@ const AppContent: React.FC = () => {
               ))}
             </div>
           </>
+        ) : page === 'veo-test' ? (
+          <div className="w-full max-w-6xl">
+            <button 
+              onClick={() => setPage('dashboard')} 
+              className="mb-4 text-purple-300 hover:text-white transition-colors"
+            >
+              ← Back to Dashboard
+            </button>
+            <div className="text-white text-center">VEO Test Page - Component Disabled for Debug</div>
+          </div>
         ) : activeTool ? (
           <VideoGenerator 
             tool={activeTool} 
