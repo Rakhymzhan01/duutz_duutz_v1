@@ -9,14 +9,39 @@ interface VideoGeneratorProps {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+type Provider = "VEO3" | "SORA2";
+
+const VEO3_MODELS = [
+  { value: "veo-3.1-fast-generate-preview", label: "VEO 3.1 Fast" },
+  { value: "veo-3.1-generate-preview", label: "VEO 3.1" },
+];
+
+const SORA_MODELS = [
+  { value: "sora-1.0-turbo", label: "Sora 1.0 Turbo" },
+  // если у тебя на бэке есть другие — добавим сюда
+];
+
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, onBack }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [model, setModel] = useState('veo-3.1-fast-generate-preview');
+
+  const [provider, setProvider] = useState<Provider>("VEO3");
+
+  const [model, setModel] = useState<string>("veo-3.1-fast-generate-preview");
   const [selectedDuration, setSelectedDuration] = useState(5);
   const [selectedResolution, setSelectedResolution] = useState({ width: 1280, height: 720 });
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  // ✅ Когда меняется provider — ставим дефолтную модель под него
+  useEffect(() => {
+    if (provider === "VEO3") {
+      setModel("veo-3.1-fast-generate-preview");
+    } else {
+      setModel("sora-1.0-turbo");
+    }
+  }, [provider]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -27,25 +52,24 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     setIsGenerating(true);
     setError('');
     setVideoUrl(null);
-    
+
     try {
       const token = localStorage.getItem('token');
       console.log('Sending request to backend...');
       console.log('Token present:', !!token);
       console.log('Token preview:', token?.substring(0, 20) + '...');
-      
+
       const response = await fetch(`${API_BASE_URL}/videos/generate-public`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // No auth needed for public endpoint
         },
         body: JSON.stringify({
           prompt,
           model,
           duration: selectedDuration,
           resolution: `${selectedResolution.width}x${selectedResolution.height}`,
-          provider: 'VEO3',
+          provider, // ✅ ВАЖНО: больше не хардкод
         }),
       });
 
@@ -55,28 +79,23 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       }
 
       const result = await response.json();
-      const videoId = result.id;  // Backend returns 'id', not 'video_id'
+      const videoId = result.id;
       console.log('Video generation started, ID:', videoId);
       console.log('Full API response:', result);
-      
+
       if (!videoId) {
         console.error('No video ID found in response:', result);
         throw new Error('Server did not return a valid video ID');
       }
 
-      // Poll for completion
       let completed = false;
-      const maxAttempts = 60; // 10 minutes with 10-second intervals
-      
+      const maxAttempts = 60;
+
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+        await new Promise(resolve => setTimeout(resolve, 10000));
         console.log(`Polling attempt ${attempt + 1}/${maxAttempts}...`);
 
-        const statusResponse = await fetch(`${API_BASE_URL}/videos/${videoId}/status-public`, {
-          headers: {
-            // No auth needed for public endpoint
-          },
-        });
+        const statusResponse = await fetch(`${API_BASE_URL}/videos/${videoId}/status-public`);
 
         if (!statusResponse.ok) {
           console.error('Status check failed:', statusResponse.status, statusResponse.statusText);
@@ -87,7 +106,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
 
         const statusResult = await statusResponse.json();
         console.log('Status result:', statusResult);
-        
+
         if (statusResult.status === 'completed' && statusResult.video_url) {
           setVideoUrl(statusResult.video_url);
           console.log('Video generation completed!');
@@ -110,6 +129,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     }
   };
 
+  const modelOptions = provider === "VEO3" ? VEO3_MODELS : SORA_MODELS;
+
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 animate-fade-in-scale">
       <button onClick={onBack} className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors mb-4">
@@ -119,7 +140,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">{tool.name}</h2>
         <p className="text-gray-300">{tool.description}</p>
-        <p className="text-sm text-purple-300 mt-2">Using Backend: Python + Google AI SDK</p>
+        <p className="text-sm text-purple-300 mt-2">
+          Using Backend Provider: <b>{provider}</b>
+        </p>
       </div>
 
       {!videoUrl && (
@@ -140,14 +163,27 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Provider</label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as Provider)}
+                className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-purple-500 focus:outline-none"
+              >
+                <option value="VEO3">VEO3</option>
+                <option value="SORA2">SORA2</option>
+              </select>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-purple-500 focus:outline-none"
               >
-                <option value="veo-3.1-fast-generate-preview">VEO 3.1 Fast</option>
-                <option value="veo-3.1-generate-preview">VEO 3.1</option>
+                {modelOptions.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
               </select>
             </div>
 
@@ -206,9 +242,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       {videoUrl && (
         <div className="text-center py-8">
           <h3 className="text-xl font-semibold text-white mb-4">Your Video is Ready!</h3>
-          <video 
-            src={videoUrl} 
-            controls 
+          <video
+            src={videoUrl}
+            controls
             className="w-full max-w-md mx-auto rounded-lg"
             autoPlay
           />
