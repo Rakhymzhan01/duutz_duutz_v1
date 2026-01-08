@@ -20,8 +20,8 @@ const BackgroundNodes = () => (
   >
     <defs>
       <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-        <stop offset="0%" style={{stopColor:'rgb(128,0,128)', stopOpacity:0.5}} />
-        <stop offset="100%" style={{stopColor:'rgb(128,0,128)', stopOpacity:0}} />
+        <stop offset="0%" style={{ stopColor: 'rgb(128,0,128)', stopOpacity: 0.5 }} />
+        <stop offset="100%" style={{ stopColor: 'rgb(128,0,128)', stopOpacity: 0 }} />
       </radialGradient>
     </defs>
     <rect width="100%" height="100%" fill="transparent" />
@@ -42,18 +42,28 @@ const BackgroundNodes = () => (
   </svg>
 );
 
+type Page =
+  | 'home'
+  | 'information'
+  | 'news'
+  | 'instruction'
+  | 'payment'
+  | 'generator'
+  | 'veo-test';
+
 const AppContent: React.FC = () => {
   console.log('AppContent rendering...');
-  
+
   const { isAuthenticated, isLoading } = useAuth();
   const { t } = useTranslation();
   const tools = useTools();
+
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
-  const [page, setPage] = useState<'dashboard' | 'generator' | 'veo-test'>('dashboard');
+  const [page, setPage] = useState<Page>('home');
   const [prompt, setPrompt] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  
+
   console.log('AppContent state:', { isLoading, isAuthenticated, page, tools: tools?.length });
 
   const handleCardClick = useCallback((tool: Tool) => {
@@ -61,14 +71,22 @@ const AppContent: React.FC = () => {
     setPage('generator');
   }, []);
 
-  const handleBackToDashboard = useCallback(() => {
-    setPage('dashboard');
+  const handleBackToHome = useCallback(() => {
+    setPage('home');
     setActiveTool(null);
   }, []);
 
   const handleAuthRequired = useCallback(() => {
     setShowAuthModal(true);
   }, []);
+
+  const menuItems: Array<{ key: Page; label: string }> = [
+    { key: 'home', label: 'Home' },
+    { key: 'information', label: 'Information' },
+    { key: 'news', label: 'News' },
+    { key: 'instruction', label: 'Instruction' },
+    { key: 'payment', label: 'Payment' },
+  ];
 
   if (isLoading) {
     return (
@@ -84,22 +102,37 @@ const AppContent: React.FC = () => {
   return (
     <div className="relative min-h-screen w-full bg-gradient-to-br from-[#0a0328] via-[#1a0c4d] to-[#4c1d95] text-white overflow-hidden">
       <BackgroundNodes />
-      
+
       {/* Top Navigation */}
       <nav className="relative z-20 flex justify-between items-center p-6">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-6">
           <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
             {t('brandName')}
           </h2>
+
+          {/* MENU BUTTONS */}
+          <div className="hidden md:flex items-center space-x-2">
+            {menuItems.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setPage(item.key);
+                  if (item.key !== 'generator') setActiveTool(null);
+                }}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all
+                  ${
+                    page === item.key
+                      ? 'bg-white/15 text-white'
+                      : 'text-purple-200 hover:text-white hover:bg-white/10'
+                  }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
-        
+
         <div className="flex items-center space-x-4">
-          {/* <button
-            onClick={() => setPage('veo-test')}
-            className="bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold py-2 px-4 rounded-lg hover:from-red-600 hover:to-orange-600 transition-all duration-200"
-          >
-            🎬 VEO Test
-          </button> */}
           <LanguageSwitcher />
           {isAuthenticated ? (
             <UserProfile />
@@ -115,7 +148,7 @@ const AppContent: React.FC = () => {
       </nav>
 
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] p-4 sm:p-8">
-        {page === 'dashboard' ? (
+        {page === 'home' ? (
           <>
             <header className="text-center mb-12">
               <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-300">
@@ -125,7 +158,7 @@ const AppContent: React.FC = () => {
                 {t('dashboard.subtitle')}
               </p>
             </header>
-            
+
             <RequestInput
               prompt={prompt}
               setPrompt={setPrompt}
@@ -134,41 +167,53 @@ const AppContent: React.FC = () => {
               onAuthRequired={handleAuthRequired}
               isAuthenticated={isAuthenticated}
             />
-            
+
             <div className="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {tools.map((tool) => (
-                <ToolCard 
-                  key={tool.id} 
-                  tool={tool} 
-                  onClick={handleCardClick}
-                  isLocked={false}
-                />
+                <ToolCard key={tool.id} tool={tool} onClick={handleCardClick} isLocked={false} />
               ))}
             </div>
           </>
+        ) : page === 'information' ? (
+          <div className="w-full max-w-4xl">
+            <h1 className="text-4xl font-bold mb-4">Information</h1>
+            <p className="text-purple-200">
+              This is a placeholder page. Next we will add real content and connect it to admin editor.
+            </p>
+          </div>
+        ) : page === 'news' ? (
+          <div className="w-full max-w-4xl">
+            <h1 className="text-4xl font-bold mb-4">News / Blog</h1>
+            <p className="text-purple-200">
+              Placeholder for blog/news list. Next we will connect it to admin panel (text + images).
+            </p>
+          </div>
+        ) : page === 'instruction' ? (
+          <div className="w-full max-w-4xl">
+            <h1 className="text-4xl font-bold mb-4">Instruction</h1>
+            <p className="text-purple-200">Placeholder for instructions.</p>
+          </div>
+        ) : page === 'payment' ? (
+          <div className="w-full max-w-4xl">
+            <h1 className="text-4xl font-bold mb-4">Payment</h1>
+            <p className="text-purple-200">Placeholder for payment page.</p>
+          </div>
         ) : page === 'veo-test' ? (
           <div className="w-full max-w-6xl">
-            <button 
-              onClick={() => setPage('dashboard')} 
+            <button
+              onClick={() => setPage('home')}
               className="mb-4 text-purple-300 hover:text-white transition-colors"
             >
-              ← Back to Dashboard
+              ← Back to Home
             </button>
             <div className="text-white text-center">VEO Test Page - Component Disabled for Debug</div>
           </div>
         ) : activeTool ? (
-          <VideoGenerator 
-            tool={activeTool} 
-            initialPrompt={prompt} 
-            onBack={handleBackToDashboard} 
-          />
+          <VideoGenerator tool={activeTool} initialPrompt={prompt} onBack={handleBackToHome} />
         ) : null}
       </main>
 
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-      />
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };
