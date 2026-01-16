@@ -11,7 +11,7 @@ import LanguageSwitcher from './components/LanguageSwitcher';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useTools } from './hooks/useTools';
 import { Tool } from './types';
-
+import AdminPanel from './components/AdminPanel';
 const BackgroundNodes = () => (
   <svg
     className="absolute inset-0 w-full h-full z-0 opacity-20"
@@ -48,6 +48,7 @@ type Page =
   | 'news'
   | 'instruction'
   | 'payment'
+  | 'admin'
   | 'generator'
   | 'veo-test';
 
@@ -86,6 +87,7 @@ const AppContent: React.FC = () => {
     { key: 'news', label: 'News' },
     { key: 'instruction', label: 'Instruction' },
     { key: 'payment', label: 'Payment' },
+    { key: 'admin', label: 'Admin' },
   ];
 
   if (isLoading) {
@@ -198,6 +200,8 @@ const AppContent: React.FC = () => {
             <h1 className="text-4xl font-bold mb-4">Payment</h1>
             <p className="text-purple-200">Placeholder for payment page.</p>
           </div>
+        ) : page === 'admin' ? (
+             <AdminPanel />
         ) : page === 'veo-test' ? (
           <div className="w-full max-w-6xl">
             <button
