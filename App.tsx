@@ -12,6 +12,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useTools } from './hooks/useTools';
 import { Tool } from './types';
 import AdminPanel from './components/AdminPanel';
+import ContentSectionPage from './components/ContentSectionPage';
+
 const BackgroundNodes = () => (
   <svg
     className="absolute inset-0 w-full h-full z-0 opacity-20"
@@ -177,29 +179,13 @@ const AppContent: React.FC = () => {
             </div>
           </>
         ) : page === 'information' ? (
-          <div className="w-full max-w-4xl">
-            <h1 className="text-4xl font-bold mb-4">Information</h1>
-            <p className="text-purple-200">
-              This is a placeholder page. Next we will add real content and connect it to admin editor.
-            </p>
-          </div>
+          <ContentSectionPage section="information" title="Information" />
         ) : page === 'news' ? (
-          <div className="w-full max-w-4xl">
-            <h1 className="text-4xl font-bold mb-4">News / Blog</h1>
-            <p className="text-purple-200">
-              Placeholder for blog/news list. Next we will connect it to admin panel (text + images).
-            </p>
-          </div>
+          <ContentSectionPage section="news" title="News / Blog" />
         ) : page === 'instruction' ? (
-          <div className="w-full max-w-4xl">
-            <h1 className="text-4xl font-bold mb-4">Instruction</h1>
-            <p className="text-purple-200">Placeholder for instructions.</p>
-          </div>
+          <ContentSectionPage section="instruction" title="Instruction" />
         ) : page === 'payment' ? (
-          <div className="w-full max-w-4xl">
-            <h1 className="text-4xl font-bold mb-4">Payment</h1>
-            <p className="text-purple-200">Placeholder for payment page.</p>
-          </div>
+          <ContentSectionPage section="payment" title="Payment" />
         ) : page === 'admin' ? (
              <AdminPanel />
         ) : page === 'veo-test' ? (

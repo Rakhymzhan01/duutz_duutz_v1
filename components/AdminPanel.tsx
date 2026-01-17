@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { contentApi, ContentItem } from '../services/contentApi';
 
 type AdminTab = 'users' | 'content';
 
 type ContentSection = 'information' | 'news' | 'blog' | 'instruction' | 'payment';
-
-type ContentLang = 'en' | 'ru' | 'kz' | 'ar';
+type ContentLang = 'en' | 'ar';
 
 type UserRow = {
   id: string;
@@ -14,19 +15,7 @@ type UserRow = {
   status: 'active' | 'blocked';
 };
 
-type Post = {
-  id: string;
-  section: ContentSection;
-  lang: ContentLang;
-  title: string;
-  body: string;
-  imageDataUrl?: string; // preview + store locally
-  createdAt: number;
-  updatedAt: number;
-};
-
-const LS_POSTS_KEY = 'duutz_admin_posts_v1';
-const LS_USERS_KEY = 'duutz_admin_users_v1';
+type Post = ContentItem;
 
 const sectionLabel: Record<ContentSection, string> = {
   information: 'Information',
@@ -38,28 +27,8 @@ const sectionLabel: Record<ContentSection, string> = {
 
 const langLabel: Record<ContentLang, string> = {
   en: 'English',
-  ru: 'Русский',
-  kz: 'Қазақша',
   ar: 'العربية',
 };
-
-function uid(prefix = 'id') {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-}
-
-function safeJsonParse<T>(value: string | null, fallback: T): T {
-  try {
-    if (!value) return fallback;
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function truncate(s: string, n = 120) {
-  if (!s) return '';
-  return s.length > n ? s.slice(0, n) + '…' : s;
-}
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -71,6 +40,7 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 const AdminPanel: React.FC = () => {
+  const { tokens } = useAuth();
   const [tab, setTab] = useState<AdminTab>('content');
 
   // ----- Users (mock now) -----
@@ -88,36 +58,45 @@ const AdminPanel: React.FC = () => {
   const [body, setBody] = useState('');
   const [imageDataUrl, setImageDataUrl] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
-  // load from localStorage
+  // -------- Инициализация пользователей (mock) --------
   useEffect(() => {
-    const savedPosts = safeJsonParse<Post[]>(localStorage.getItem(LS_POSTS_KEY), []);
-    const savedUsers = safeJsonParse<UserRow[]>(localStorage.getItem(LS_USERS_KEY), []);
-
-    setPosts(Array.isArray(savedPosts) ? savedPosts : []);
-
-    // seed users if empty
-    if (Array.isArray(savedUsers) && savedUsers.length > 0) {
-      setUsers(savedUsers);
-    } else {
-      const seed: UserRow[] = [
-        { id: uid('u'), name: 'Aibaty B', email: 'aibaty@example.com', role: 'admin', status: 'active' },
-        { id: uid('u'), name: 'John Doe', email: 'john@example.com', role: 'user', status: 'active' },
-        { id: uid('u'), name: 'Sara Ali', email: 'sara@example.com', role: 'user', status: 'blocked' },
-      ];
-      setUsers(seed);
-      localStorage.setItem(LS_USERS_KEY, JSON.stringify(seed));
-    }
+    const seed: UserRow[] = [
+      { id: 'u1', name: 'Aibaty B', email: 'aibaty@example.com', role: 'admin', status: 'active' },
+      { id: 'u2', name: 'John Doe', email: 'john@example.com', role: 'user', status: 'active' },
+      { id: 'u3', name: 'Sara Ali', email: 'sara@example.com', role: 'user', status: 'blocked' },
+    ];
+    setUsers(seed);
   }, []);
 
-  // persist
-  useEffect(() => {
-    localStorage.setItem(LS_POSTS_KEY, JSON.stringify(posts));
-  }, [posts]);
+  // -------- Загрузка контента с бэка --------
+  const loadPosts = async (section: ContentSection, lang: ContentLang) => {
+    try {
+      setLoadingPosts(true);
+      const items = await contentApi.list(section, lang);
+      setPosts((prev) => {
+        const rest = prev.filter((p) => !(p.section === section && p.lang === lang));
+        return [...rest, ...items];
+      });
+    } catch (e) {
+      console.error('Failed to load content', e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
 
+  // Загружаем при первом заходе
   useEffect(() => {
-    localStorage.setItem(LS_USERS_KEY, JSON.stringify(users));
-  }, [users]);
+    loadPosts(activeSection, activeLang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Подгрузка при переключении секции/языка
+  useEffect(() => {
+    loadPosts(activeSection, activeLang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, activeLang]);
 
   const filteredUsers = useMemo(() => {
     const q = userQuery.trim().toLowerCase();
@@ -135,7 +114,7 @@ const AdminPanel: React.FC = () => {
   const visiblePosts = useMemo(() => {
     return posts
       .filter((p) => p.section === activeSection && p.lang === activeLang)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+      .sort((a, b) => b.updated_at - a.updated_at);
   }, [posts, activeSection, activeLang]);
 
   const resetForm = () => {
@@ -147,17 +126,22 @@ const AdminPanel: React.FC = () => {
 
   const startEdit = (p: Post) => {
     setEditingId(p.id);
-    setActiveSection(p.section);
-    setActiveLang(p.lang);
+    setActiveSection(p.section as ContentSection);
+    setActiveLang(p.lang as ContentLang);
     setTitle(p.title);
     setBody(p.body);
-    setImageDataUrl(p.imageDataUrl);
+    setImageDataUrl(p.image_data_url || undefined);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const removePost = (id: string) => {
-    setPosts((prev) => prev.filter((p) => p.id !== id));
-    if (editingId === id) resetForm();
+  const removePost = async (id: string) => {
+    try {
+      await contentApi.remove(id, tokens || null);
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      if (editingId === id) resetForm();
+    } catch (e) {
+      console.error('Failed to delete content', e);
+    }
   };
 
   const onPickImage: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
@@ -170,44 +154,44 @@ const AdminPanel: React.FC = () => {
   };
 
   const savePost = async () => {
-    if (!title.trim()) return;
-    if (!body.trim()) return;
+    if (!title.trim() || !body.trim()) return;
 
     setSaving(true);
     try {
-      const now = Date.now();
-
       if (editingId) {
+        const updated = await contentApi.update(
+          editingId,
+          {
+            section: activeSection,
+            lang: activeLang,
+            title: title.trim(),
+            body: body.trim(),
+            image_data_url: imageDataUrl,
+          },
+          tokens || null
+        );
+
         setPosts((prev) =>
-          prev.map((p) =>
-            p.id === editingId
-              ? {
-                  ...p,
-                  section: activeSection,
-                  lang: activeLang,
-                  title: title.trim(),
-                  body: body.trim(),
-                  imageDataUrl,
-                  updatedAt: now,
-                }
-              : p
-          )
+          prev.map((p) => (p.id === updated.id ? updated : p))
         );
       } else {
-        const newPost: Post = {
-          id: uid('post'),
-          section: activeSection,
-          lang: activeLang,
-          title: title.trim(),
-          body: body.trim(),
-          imageDataUrl,
-          createdAt: now,
-          updatedAt: now,
-        };
-        setPosts((prev) => [newPost, ...prev]);
+        const created = await contentApi.create(
+          {
+            section: activeSection,
+            lang: activeLang,
+            title: title.trim(),
+            body: body.trim(),
+            image_data_url: imageDataUrl,
+          },
+          tokens || null
+        );
+
+        setPosts((prev) => [created, ...prev]);
       }
 
       resetForm();
+    } catch (e) {
+      console.error('Failed to save content', e);
     } finally {
       setSaving(false);
     }
@@ -240,9 +224,10 @@ const AdminPanel: React.FC = () => {
         <button
           onClick={() => setTab('content')}
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border
-            ${tab === 'content'
-              ? 'bg-white/15 text-white border-white/25'
-              : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
+            ${
+              tab === 'content'
+                ? 'bg-white/15 text-white border-white/25'
+                : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
         >
           Editor Panel
@@ -250,9 +235,10 @@ const AdminPanel: React.FC = () => {
         <button
           onClick={() => setTab('users')}
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border
-            ${tab === 'users'
-              ? 'bg-white/15 text-white border-white/25'
-              : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
+            ${
+              tab === 'users'
+                ? 'bg-white/15 text-white border-white/25'
+                : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
         >
           User Management
@@ -284,7 +270,9 @@ const AdminPanel: React.FC = () => {
                   <label className="text-sm text-purple-200">Section</label>
                   <select
                     value={activeSection}
-                    onChange={(e) => setActiveSection(e.target.value as ContentSection)}
+                    onChange={(e) =>
+                      setActiveSection(e.target.value as ContentSection)
+                    }
                     className="mt-1 w-full bg-[#12083a] border border-white/10 rounded-lg px-3 py-2 text-white"
                   >
                     <option value="information">Information</option>
@@ -299,12 +287,12 @@ const AdminPanel: React.FC = () => {
                   <label className="text-sm text-purple-200">Language</label>
                   <select
                     value={activeLang}
-                    onChange={(e) => setActiveLang(e.target.value as ContentLang)}
+                    onChange={(e) =>
+                      setActiveLang(e.target.value as ContentLang)
+                    }
                     className="mt-1 w-full bg-[#12083a] border border-white/10 rounded-lg px-3 py-2 text-white"
                   >
                     <option value="en">English</option>
-                    <option value="ru">Русский</option>
-                    <option value="kz">Қазақша</option>
                     <option value="ar">العربية</option>
                   </select>
                 </div>
@@ -332,7 +320,9 @@ const AdminPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-sm text-purple-200">Image (optional)</label>
+                <label className="text-sm text-purple-200">
+                  Image (optional)
+                </label>
                 <div className="mt-1 flex items-center gap-3">
                   <input
                     type="file"
@@ -373,7 +363,8 @@ const AdminPanel: React.FC = () => {
               </button>
 
               <p className="text-xs text-purple-200/80">
-                Сейчас данные сохраняются в браузере (localStorage). Позже подключим бэк и базу.
+                Data is now saved on backend via API. Later we can connect this
+                with public pages.
               </p>
             </div>
           </div>
@@ -384,38 +375,39 @@ const AdminPanel: React.FC = () => {
               <div>
                 <h2 className="text-xl font-bold">Content</h2>
                 <p className="text-sm text-purple-200">
-                  {sectionLabel[activeSection]} • {langLabel[activeLang]} • {visiblePosts.length} items
+                  {sectionLabel[activeSection]} • {langLabel[activeLang]} •{' '}
+                  {visiblePosts.length} items
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setActiveSection('information')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
                 >
                   Information
                 </button>
                 <button
                   onClick={() => setActiveSection('news')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
                 >
                   News
                 </button>
                 <button
                   onClick={() => setActiveSection('blog')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
                 >
                   Blog
                 </button>
                 <button
                   onClick={() => setActiveSection('instruction')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
                 >
                   Instruction
                 </button>
                 <button
                   onClick={() => setActiveSection('payment')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
                 >
                   Payment
                 </button>
@@ -424,14 +416,15 @@ const AdminPanel: React.FC = () => {
 
             <div className="mt-4 flex items-center gap-2">
               <span className="text-sm text-purple-200">Lang:</span>
-              {(['en', 'ru', 'kz', 'ar'] as ContentLang[]).map((l) => (
+              {(['en', 'ar'] as ContentLang[]).map((l) => (
                 <button
                   key={l}
                   onClick={() => setActiveLang(l)}
                   className={`px-3 py-1.5 rounded-lg text-xs border transition-all
-                    ${activeLang === l
-                      ? 'bg-white/15 text-white border-white/25'
-                      : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
+                    ${
+                      activeLang === l
+                        ? 'bg-white/15 text-white border-white/25'
+                        : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                   {langLabel[l]}
@@ -440,9 +433,12 @@ const AdminPanel: React.FC = () => {
             </div>
 
             <div className="mt-5 space-y-3">
-              {visiblePosts.length === 0 ? (
+              {loadingPosts ? (
+                <div className="text-purple-200">Loading...</div>
+              ) : visiblePosts.length === 0 ? (
                 <div className="text-purple-200">
-                  No content yet for this section/language. Add something on the left.
+                  No content yet for this section/language. Add something on the
+                  left.
                 </div>
               ) : (
                 visiblePosts.map((p) => (
@@ -450,26 +446,28 @@ const AdminPanel: React.FC = () => {
                     key={p.id}
                     className="bg-black/20 border border-white/10 rounded-xl p-4"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-start justify_between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs px-2 py-1 rounded bg-white/10 border border-white/10">
-                            {sectionLabel[p.section]}
+                            {sectionLabel[p.section as ContentSection]}
                           </span>
                           <span className="text-xs px-2 py-1 rounded bg-white/10 border border-white/10">
-                            {langLabel[p.lang]}
+                            {langLabel[p.lang as ContentLang]}
                           </span>
                           <span className="text-xs text-purple-200/80">
-                            {new Date(p.updatedAt).toLocaleString()}
+                            {new Date(p.updated_at * 1000).toLocaleString()}
                           </span>
                         </div>
-                        <h3 className="mt-2 text-lg font-bold break-words">{p.title}</h3>
-                        <p className="mt-1 text-sm text-purple-100/90 break-words">
-                          {truncate(p.body, 160)}
-                        </p>
+                        <h3 className="mt-2 text-lg font-bold break-words">
+                          {p.title}
+                        </h3>
+                        <div className="mt-1 text-sm text-purple-100/90 break-words whitespace-pre-wrap max-h-40 overflow-y-auto pr-2">
+                          {p.body}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                         <button
                           onClick={() => startEdit(p)}
                           className="px-3 py-2 rounded-lg text-xs bg-white/10 hover:bg-white/15 border border-white/10"
@@ -485,10 +483,10 @@ const AdminPanel: React.FC = () => {
                       </div>
                     </div>
 
-                    {p.imageDataUrl && (
+                    {p.image_data_url && (
                       <div className="mt-3">
                         <img
-                          src={p.imageDataUrl}
+                          src={p.image_data_url}
                           alt="Post"
                           className="w-full max-h-64 object-cover rounded-xl border border-white/10"
                         />
@@ -509,7 +507,7 @@ const AdminPanel: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold">User Management</h2>
               <p className="text-sm text-purple-200">
-                Пока mock UI. Потом подключим API /admin/users.
+                Mock UI for now. Later we can connect real /admin/users API.
               </p>
             </div>
 
