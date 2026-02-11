@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tool } from '../types';
+import { useAuth } from '../contexts/AuthContext'; // проверь путь при сборке
 
 interface VideoGeneratorProps {
   tool: Tool;
@@ -9,37 +10,46 @@ interface VideoGeneratorProps {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-type Provider = "VEO3" | "SORA2";
+type Provider = 'VEO3' | 'SORA2';
 
 const VEO3_MODELS = [
-  { value: "veo-3.1-fast-generate-preview", label: "VEO 3.1 Fast" },
-  { value: "veo-3.1-generate-preview", label: "VEO 3.1" },
+  { value: 'veo-3.1-fast-generate-preview', label: 'VEO 3.1 Fast' },
+  { value: 'veo-3.1-generate-preview', label: 'VEO 3.1' },
 ];
 
 const SORA_MODELS = [
-  { value: "sora-1.0-turbo", label: "Sora 1.0 Turbo" },
-  // если у тебя на бэке есть другие — добавим сюда
+  { value: 'sora-1.0-turbo', label: 'Sora 1.0 Turbo' },
+  // если на бэке есть другие — можно добавить сюда
 ];
 
-const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, onBack }) => {
+const VideoGenerator: React.FC<VideoGeneratorProps> = ({
+  tool,
+  initialPrompt,
+  onBack,
+}) => {
   const [prompt, setPrompt] = useState(initialPrompt);
 
-  const [provider, setProvider] = useState<Provider>("VEO3");
-
-  const [model, setModel] = useState<string>("veo-3.1-fast-generate-preview");
+  const [provider, setProvider] = useState<Provider>('VEO3');
+  const [model, setModel] = useState<string>('veo-3.1-fast-generate-preview');
   const [selectedDuration, setSelectedDuration] = useState(5);
-  const [selectedResolution, setSelectedResolution] = useState({ width: 1280, height: 720 });
+  const [selectedResolution, setSelectedResolution] = useState({
+    width: 1280,
+    height: 720,
+  });
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
+  // 🔐 auth-контекст
+  const { tokens, isAuthenticated } = useAuth();
+
   // ✅ Когда меняется provider — ставим дефолтную модель под него
   useEffect(() => {
-    if (provider === "VEO3") {
-      setModel("veo-3.1-fast-generate-preview");
+    if (provider === 'VEO3') {
+      setModel('veo-3.1-fast-generate-preview');
     } else {
-      setModel("sora-1.0-turbo");
+      setModel('sora-1.0-turbo');
     }
   }, [provider]);
 
@@ -49,33 +59,49 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       return;
     }
 
+    if (!isAuthenticated || !tokens?.access_token) {
+      setError('Please sign in to generate videos.');
+      return;
+    }
+
+    if (!API_BASE_URL) {
+      setError('API base URL is not configured.');
+      return;
+    }
+
     setIsGenerating(true);
     setError('');
     setVideoUrl(null);
 
     try {
-      const token = localStorage.getItem('token');
-      console.log('Sending request to backend...');
-      console.log('Token present:', !!token);
-      console.log('Token preview:', token?.substring(0, 20) + '...');
+      const accessToken = tokens.access_token;
 
-      const response = await fetch(`${API_BASE_URL}/videos/generate-public`, {
+      console.log('Sending request to backend...');
+      console.log('Token present:', !!accessToken);
+      console.log(
+        'Token preview:',
+        (accessToken ?? '').substring(0, 20) + '...',
+      );
+
+      // ⚙️ используем тот же эндпоинт, что работал через curl: /videos/generate
+      const response = await fetch(`${API_BASE_URL}/videos/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`, // ✅ добавили Bearer
         },
         body: JSON.stringify({
           prompt,
           model,
           duration: selectedDuration,
           resolution: `${selectedResolution.width}x${selectedResolution.height}`,
-          provider, // ✅ ВАЖНО: больше не хардкод
+          provider,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to start video generation');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to start video generation');
       }
 
       const result = await response.json();
@@ -89,19 +115,33 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       }
 
       let completed = false;
-      const maxAttempts = 60;
+      const maxAttempts = 60; // 60 * 10s = 10 минут
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise((resolve) => setTimeout(resolve, 10000));
         console.log(`Polling attempt ${attempt + 1}/${maxAttempts}...`);
 
-        const statusResponse = await fetch(`${API_BASE_URL}/videos/${videoId}/status-public`);
+        const statusResponse = await fetch(
+          `${API_BASE_URL}/videos/${videoId}/status`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${accessToken}`, // ✅ токен и на статус
+            },
+          },
+        );
 
         if (!statusResponse.ok) {
-          console.error('Status check failed:', statusResponse.status, statusResponse.statusText);
+          console.error(
+            'Status check failed:',
+            statusResponse.status,
+            statusResponse.statusText,
+          );
           const errorText = await statusResponse.text();
           console.error('Status error details:', errorText);
-          throw new Error(`Failed to check video status: ${statusResponse.status} ${statusResponse.statusText}`);
+          throw new Error(
+            `Failed to check video status: ${statusResponse.status} ${statusResponse.statusText}`,
+          );
         }
 
         const statusResult = await statusResponse.json();
@@ -120,7 +160,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       if (!completed) {
         throw new Error('Video generation timed out. Please try again.');
       }
-
     } catch (e: any) {
       console.error('Generation error:', e);
       setError(e.message || 'An unknown error occurred.');
@@ -129,11 +168,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
     }
   };
 
-  const modelOptions = provider === "VEO3" ? VEO3_MODELS : SORA_MODELS;
+  const modelOptions = provider === 'VEO3' ? VEO3_MODELS : SORA_MODELS;
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 animate-fade-in-scale">
-      <button onClick={onBack} className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors mb-4">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors mb-4"
+      >
         ← Back to Dashboard
       </button>
 
@@ -148,7 +190,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
       {!videoUrl && (
         <div className="space-y-4">
           <div>
-            <label htmlFor="prompt" className="block text-sm font-medium text-gray-300 mb-2">
+            <label
+              htmlFor="prompt"
+              className="block text-sm font-medium text-gray-300 mb-2"
+            >
               Video Description
             </label>
             <textarea
@@ -163,7 +208,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Provider</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Provider
+              </label>
               <select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as Provider)}
@@ -175,20 +222,26 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Model
+              </label>
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-purple-500 focus:outline-none"
               >
                 {modelOptions.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Duration (seconds)</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Duration (seconds)
+              </label>
               <select
                 value={selectedDuration}
                 onChange={(e) => setSelectedDuration(Number(e.target.value))}
@@ -200,11 +253,15 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Quality</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Quality
+              </label>
               <select
                 value={`${selectedResolution.width}x${selectedResolution.height}`}
                 onChange={(e) => {
-                  const [width, height] = e.target.value.split('x').map(Number);
+                  const [width, height] = e.target.value
+                    .split('x')
+                    .map(Number);
                   setSelectedResolution({ width, height });
                 }}
                 className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white focus:border-purple-500 focus:outline-none"
@@ -235,13 +292,17 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ tool, initialPrompt, on
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-white text-lg">Generating your video...</p>
-          <p className="text-gray-400 text-sm mt-2">This may take a few minutes</p>
+          <p className="text-gray-400 text-sm mt-2">
+            This may take a few minutes
+          </p>
         </div>
       )}
 
       {videoUrl && (
         <div className="text-center py-8">
-          <h3 className="text-xl font-semibold text-white mb-4">Your Video is Ready!</h3>
+          <h3 className="text-xl font-semibold text-white mb-4">
+            Your Video is Ready!
+          </h3>
           <video
             src={videoUrl}
             controls

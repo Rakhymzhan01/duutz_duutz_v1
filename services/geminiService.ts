@@ -1,85 +1,75 @@
+/**
+ * Frontend service for video generation.
+ * Uses API Gateway via Nginx route /api/ -> 127.0.0.1:8000
+ */
 
-import { GoogleGenAI } from "@google/genai";
+const API_BASE_URL = "/api/v1";
 
-const API_KEY = import.meta.env.VITE_API_KEY;
+function getAccessToken(): string | null {
+  try {
+    const raw = localStorage.getItem("auth_tokens");
+    if (!raw) return null;
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set.");
+    const parsed = JSON.parse(raw);
+    // в localStorage лежит access_token (как в AuthProvider)
+    return parsed.access_token ?? parsed.token ?? null;
+  } catch {
+    return null;
+  }
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+export async function generateVideo(
+  prompt: string,
+  imageFile?: File | null
+): Promise<string> {
+  const token = getAccessToken();
 
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // remove "data:*/*;base64," prefix
-      resolve(result.split(',')[1]);
-    };
-    reader.onerror = (error) => reject(error);
+  // если токена нет — сразу говорим, что нужно войти
+  if (!token) {
+    throw new Error("Authentication required");
+  }
+
+  const fd = new FormData();
+  fd.append("prompt", prompt);
+
+  if (imageFile) {
+    fd.append("image", imageFile);
+  }
+
+  const res = await fetch(`${API_BASE_URL}/videos/generate-public`, {
+    method: "POST",
+    body: fd,
+    credentials: "include", // можно оставить, куки всё равно почти не используются
+    headers: {
+      // важно: токен только в заголовке, не в body
+      Authorization: `Bearer ${token}`,
+    },
   });
-};
 
-const pollOperation = async <T,>(operation: any): Promise<any> => {
-  let currentOperation = operation;
-  while (!currentOperation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    currentOperation = await ai.operations.getVideosOperation({ operation: currentOperation });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      msg = data?.detail || data?.message || JSON.stringify(data);
+    } catch {
+      // игнорируем, оставляем стандартное сообщение
+    }
+    throw new Error(msg);
   }
-  return currentOperation;
-};
 
-export const generateVideo = async (prompt: string, imageFile?: File | null): Promise<string> => {
-  try {
-    let initialOperation;
+  const data: any = await res.json();
 
-    if (imageFile) {
-      const base64Image = await fileToBase64(imageFile);
-      initialOperation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt: prompt,
-        image: {
-          imageBytes: base64Image,
-          mimeType: imageFile.type,
-        },
-        config: {
-          numberOfVideos: 1,
-        },
-      });
-    } else {
-      initialOperation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt: prompt,
-        config: {
-          numberOfVideos: 1,
-        },
-      });
-    }
+  const url =
+    data?.video_url ||
+    data?.videoUrl ||
+    data?.file_url ||
+    data?.fileUrl ||
+    data?.url;
 
-    const completedOperation = await pollOperation(initialOperation);
+  if (typeof url === "string" && url.length > 0) return url;
 
-    const downloadLink = completedOperation.response?.generatedVideos?.[0]?.video?.uri;
+  const id = data?.id || data?.video_id || data?.videoId;
+  if (typeof id === "string" && id.length > 0) return `/${id}/file`;
 
-    if (!downloadLink) {
-      throw new Error("Video generation failed: No download link found.");
-    }
-
-    const videoResponse = await fetch(`${downloadLink}&key=${API_KEY}`);
-    if (!videoResponse.ok) {
-        throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-    }
-
-    const videoBlob = await videoResponse.blob();
-    const videoUrl = URL.createObjectURL(videoBlob);
-    return videoUrl;
-
-  } catch (error) {
-    console.error("Error generating video:", error);
-    if (error instanceof Error) {
-        throw new Error(`Video generation failed: ${error.message}`);
-    }
-    throw new Error("An unknown error occurred during video generation.");
-  }
-};
+  throw new Error("Unexpected API response: no video url/id");
+}

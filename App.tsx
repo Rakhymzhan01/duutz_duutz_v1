@@ -57,7 +57,7 @@ type Page =
 const AppContent: React.FC = () => {
   console.log('AppContent rendering...');
 
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { t } = useTranslation();
   const tools = useTools();
 
@@ -67,7 +67,18 @@ const AppContent: React.FC = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  console.log('AppContent state:', { isLoading, isAuthenticated, page, tools: tools?.length });
+  console.log('AppContent state:', {
+    isLoading,
+    isAuthenticated,
+    page,
+    tools: tools?.length,
+    userEmail: user?.email,
+  });
+
+  // --- ADMIN LOGIC ---
+  // здесь перечисляем аккаунты, которым показываем Admin
+  const ADMIN_EMAILS = ['aibatyr111@gmail.com']; // можешь добавить ещё e-mail, если нужно
+  const isAdmin = isAuthenticated && !!user && ADMIN_EMAILS.includes(user.email);
 
   const handleCardClick = useCallback((tool: Tool) => {
     setActiveTool(tool);
@@ -92,6 +103,11 @@ const AppContent: React.FC = () => {
     { key: 'admin', label: 'Admin' },
   ];
 
+  // Показываем Admin в меню только админу
+  const visibleMenuItems = isAdmin
+    ? menuItems
+    : menuItems.filter((item) => item.key !== 'admin');
+
   if (isLoading) {
     return (
       <div className="relative min-h-screen w-full bg-gradient-to-br from-[#0a0328] via-[#1a0c4d] to-[#4c1d95] text-white overflow-hidden">
@@ -114,12 +130,15 @@ const AppContent: React.FC = () => {
             {t('brandName')}
           </h2>
 
-          {/* MENU BUTTONS */}
+          {/* Desktop MENU BUTTONS */}
           <div className="hidden md:flex items-center space-x-2">
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <button
                 key={item.key}
                 onClick={() => {
+                  // защита на всякий случай: если как-то попали на admin без прав
+                  if (item.key === 'admin' && !isAdmin) return;
+
                   setPage(item.key);
                   if (item.key !== 'generator') setActiveTool(null);
                 }}
@@ -150,6 +169,31 @@ const AppContent: React.FC = () => {
           )}
         </div>
       </nav>
+
+      {/* Mobile menu */}
+      <div className="relative z-20 md:hidden px-4 pb-2">
+        <div className="flex flex-wrap justify-center gap-2">
+          {visibleMenuItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => {
+                if (item.key === 'admin' && !isAdmin) return;
+
+                setPage(item.key);
+                if (item.key !== 'generator') setActiveTool(null);
+              }}
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all
+                ${
+                  page === item.key
+                    ? 'bg-white/20 text-white'
+                    : 'text-purple-200 bg-white/5 hover:bg-white/10 hover:text-white'
+                }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] p-4 sm:p-8">
         {page === 'home' ? (
@@ -187,7 +231,13 @@ const AppContent: React.FC = () => {
         ) : page === 'payment' ? (
           <ContentSectionPage section="payment" title="Payment" />
         ) : page === 'admin' ? (
-             <AdminPanel />
+          isAdmin ? (
+            <AdminPanel />
+          ) : (
+            <div className="w-full max-w-4xl text-center text-red-200">
+              You do not have permission to access the admin panel.
+            </div>
+          )
         ) : page === 'veo-test' ? (
           <div className="w-full max-w-6xl">
             <button
@@ -196,7 +246,9 @@ const AppContent: React.FC = () => {
             >
               ← Back to Home
             </button>
-            <div className="text-white text-center">VEO Test Page - Component Disabled for Debug</div>
+            <div className="text-white text-center">
+              VEO Test Page - Component Disabled for Debug
+            </div>
           </div>
         ) : activeTool ? (
           <VideoGenerator tool={activeTool} initialPrompt={prompt} onBack={handleBackToHome} />

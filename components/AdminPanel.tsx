@@ -39,6 +39,28 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+// безопасно получаем timestamp для сортировки (учитываем updated_at / created_at)
+function getPostTimestamp(item: Post): number {
+  const raw = (item.updated_at as any) || (item.created_at as any);
+  if (!raw) return 0;
+
+  if (typeof raw === 'number') {
+    const d = new Date(raw * 1000);
+    const t = d.getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+
+  const d = new Date(raw);
+  const t = d.getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function formatPostDate(item: Post): string {
+  const ts = getPostTimestamp(item);
+  if (!ts) return '';
+  return new Date(ts).toLocaleString();
+}
+
 const AdminPanel: React.FC = () => {
   const { tokens } = useAuth();
   const [tab, setTab] = useState<AdminTab>('content');
@@ -57,6 +79,7 @@ const AdminPanel: React.FC = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [imageDataUrl, setImageDataUrl] = useState<string | undefined>(undefined);
+  const [videoUrl, setVideoUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(false);
 
@@ -74,7 +97,9 @@ const AdminPanel: React.FC = () => {
   const loadPosts = async (section: ContentSection, lang: ContentLang) => {
     try {
       setLoadingPosts(true);
+
       const items = await contentApi.list(section, lang);
+
       setPosts((prev) => {
         const rest = prev.filter((p) => !(p.section === section && p.lang === lang));
         return [...rest, ...items];
@@ -114,7 +139,7 @@ const AdminPanel: React.FC = () => {
   const visiblePosts = useMemo(() => {
     return posts
       .filter((p) => p.section === activeSection && p.lang === activeLang)
-      .sort((a, b) => b.updated_at - a.updated_at);
+      .sort((a, b) => getPostTimestamp(b) - getPostTimestamp(a));
   }, [posts, activeSection, activeLang]);
 
   const resetForm = () => {
@@ -122,6 +147,7 @@ const AdminPanel: React.FC = () => {
     setTitle('');
     setBody('');
     setImageDataUrl(undefined);
+    setVideoUrl('');
   };
 
   const startEdit = (p: Post) => {
@@ -131,6 +157,7 @@ const AdminPanel: React.FC = () => {
     setTitle(p.title);
     setBody(p.body);
     setImageDataUrl(p.image_data_url || undefined);
+    setVideoUrl(p.video_url || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -158,16 +185,19 @@ const AdminPanel: React.FC = () => {
 
     setSaving(true);
     try {
+      const payload = {
+        section: activeSection,
+        lang: activeLang,
+        title: title.trim(),
+        body: body.trim(),
+        image_data_url: imageDataUrl || null,
+        video_url: videoUrl.trim() || undefined,
+      };
+
       if (editingId) {
         const updated = await contentApi.update(
           editingId,
-          {
-            section: activeSection,
-            lang: activeLang,
-            title: title.trim(),
-            body: body.trim(),
-            image_data_url: imageDataUrl,
-          },
+          payload,
           tokens || null
         );
 
@@ -176,13 +206,7 @@ const AdminPanel: React.FC = () => {
         );
       } else {
         const created = await contentApi.create(
-          {
-            section: activeSection,
-            lang: activeLang,
-            title: title.trim(),
-            body: body.trim(),
-            image_data_url: imageDataUrl,
-          },
+          payload,
           tokens || null
         );
 
@@ -353,6 +377,21 @@ const AdminPanel: React.FC = () => {
                 )}
               </div>
 
+              <div>
+                <label className="text-sm text-purple-200">
+                  YouTube video URL (optional)
+                </label>
+                <input
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="mt-1 w-full bg-[#12083a] border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-white/40"
+                />
+                <p className="mt-1 text-xs text-purple-200/80">
+                  Paste a YouTube link — it will appear as embedded video on the public page.
+                </p>
+              </div>
+
               <button
                 onClick={savePost}
                 disabled={saving || !title.trim() || !body.trim()}
@@ -383,31 +422,31 @@ const AdminPanel: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setActiveSection('information')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
                 >
                   Information
                 </button>
                 <button
                   onClick={() => setActiveSection('news')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
                 >
                   News
                 </button>
                 <button
                   onClick={() => setActiveSection('blog')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
                 >
                   Blog
                 </button>
                 <button
                   onClick={() => setActiveSection('instruction')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
                 >
                   Instruction
                 </button>
                 <button
                   onClick={() => setActiveSection('payment')}
-                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg_white/10"
+                  className="px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/10 hover:bg-white/10"
                 >
                   Payment
                 </button>
@@ -446,7 +485,7 @@ const AdminPanel: React.FC = () => {
                     key={p.id}
                     className="bg-black/20 border border-white/10 rounded-xl p-4"
                   >
-                    <div className="flex items-start justify_between gap-4">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs px-2 py-1 rounded bg-white/10 border border-white/10">
@@ -455,9 +494,16 @@ const AdminPanel: React.FC = () => {
                           <span className="text-xs px-2 py-1 rounded bg-white/10 border border-white/10">
                             {langLabel[p.lang as ContentLang]}
                           </span>
-                          <span className="text-xs text-purple-200/80">
-                            {new Date(p.updated_at * 1000).toLocaleString()}
-                          </span>
+                          {formatPostDate(p) && (
+                            <span className="text-xs text-purple-200/80">
+                              {formatPostDate(p)}
+                            </span>
+                          )}
+                          {p.video_url && (
+                            <span className="text-xs px-2 py-1 rounded bg-purple-500/20 border border-purple-400/40 text-purple-100">
+                              Video
+                            </span>
+                          )}
                         </div>
                         <h3 className="mt-2 text-lg font-bold break-words">
                           {p.title}
@@ -465,6 +511,11 @@ const AdminPanel: React.FC = () => {
                         <div className="mt-1 text-sm text-purple-100/90 break-words whitespace-pre-wrap max-h-40 overflow-y-auto pr-2">
                           {p.body}
                         </div>
+                        {p.video_url && (
+                          <p className="mt-2 text-xs text-purple-200 break-all">
+                            Video URL: {p.video_url}
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex flex-col items-end gap-2 shrink-0">

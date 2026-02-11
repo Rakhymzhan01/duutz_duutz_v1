@@ -16,8 +16,9 @@ export type ContentItem = {
   title: string;
   body: string;
   image_data_url?: string | null;
+  video_url?: string | null;
 
-  // с бэка приходят ISO-строки
+  // с бэка приходят ISO-строки дат (например "2026-01-22T10:15:00Z") или null
   created_at: string | null;
   updated_at: string | null;
 
@@ -30,6 +31,7 @@ type ContentPayload = {
   title: string;
   body: string;
   image_data_url?: string | null;
+  video_url?: string;
 };
 
 async function request<T>(
